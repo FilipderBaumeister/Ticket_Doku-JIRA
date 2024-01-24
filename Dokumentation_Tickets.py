@@ -9,9 +9,9 @@ from ttkthemes import ThemedTk
 desktop_path = os.path.join(os.path.expanduser("~"), "Documents")
 
 # Jira login data
-jira_server = "https://jira.bbraun.com"  # URL to your Jira server
-jira_username = "Jira_PDT_01"  # Your username
-jira_password = "Ji#bbmag#PDT#2023"  # Your password
+jira_server = "."  # URL to your Jira server
+jira_username = "."  # Your username
+jira_password = "."  # Your password
 
 # Connect to Jira
 try:
