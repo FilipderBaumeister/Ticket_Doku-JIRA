@@ -18,6 +18,7 @@ using System.Windows.Shapes;
 using System.Xml.Linq;
 using Excel = Microsoft.Office.Interop.Excel;
 using Newtonsoft.Json.Linq;
+using System.Net.Http;
 
 namespace Ticket_Doku_Jira
 {
@@ -32,6 +33,7 @@ namespace Ticket_Doku_Jira
         }
         string jiraUsername = ".";
         string jiraPassword = ".";
+        string jiraServer = ".";
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
         private async void Button_Click(object sender, RoutedEventArgs e)
@@ -41,8 +43,8 @@ namespace Ticket_Doku_Jira
             string ticket_number = ticket_var.Text;
             string status = status_var.Text;
             string priority = priority_var.Text;
-
-            string filename = Path.Combine(desktopPath, "Dokumentation_Ticket.xlsx");
+            
+            string filename = IOPath.Combine(desktopPath, "Dokumentation_Ticket.xlsx");
 
             Excel.Application excelApp = new Excel.Application();
             excelApp.Visible = false;
