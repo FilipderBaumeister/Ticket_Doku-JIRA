@@ -30,9 +30,9 @@ namespace Ticket_Doku_Jira
         {
             InitializeComponent();
         }
-        string jiraServer = "https://jira.bbraun.com";
-        string jiraUsername = "Jira_PDT_01";
-        string jiraPassword = "Ji#bbmag#PDT#2024";
+        string jiraServer = ".";
+        string jiraUsername = "J.";
+        string jiraPassword = ".";
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
         private void Button_Click(object sender, RoutedEventArgs e)
