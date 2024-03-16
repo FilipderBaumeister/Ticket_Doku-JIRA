@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using IOPath = System.IO.Path;
@@ -30,12 +30,11 @@ namespace Ticket_Doku_Jira
         {
             InitializeComponent();
         }
-        string jiraServer = ".";
-        string jiraUsername = "J.";
+        string jiraUsername = ".";
         string jiraPassword = ".";
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private async void Button_Click(object sender, RoutedEventArgs e)
         {
             string start_date = start_var.Text;
             string end_date = end_var.Text;
@@ -43,8 +42,7 @@ namespace Ticket_Doku_Jira
             string status = status_var.Text;
             string priority = priority_var.Text;
 
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string filename = IOPath.Combine(desktopPath, "Dokumentation_Tickets12.xlsx");
+            string filename = Path.Combine(desktopPath, "Dokumentation_Ticket.xlsx");
 
             Excel.Application excelApp = new Excel.Application();
             excelApp.Visible = false;
@@ -96,22 +94,50 @@ namespace Ticket_Doku_Jira
                 jql += $" AND priority = '{priority}'";
             }
 
-            Excel.Range usedRange = worksheet.UsedRange;
-            int rowCount = usedRange.Rows.Count;
-            worksheet.Rows["2:" + rowCount].Delete();
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{jiraUsername}:{jiraPassword}")));
 
-            Excel.Range startRange = worksheet.Cells[2, 1];
-            Excel.Range endRange = worksheet.Cells[rowCount + 1, 11];
-            Excel.Range range = worksheet.Range[startRange, endRange];
-            range.ClearContents();
+                HttpResponseMessage response = await client.GetAsync($"{jiraServer}/rest/api/2/search?jql={jql}");
+                response.EnsureSuccessStatusCode();
+                string responseBody = await response.Content.ReadAsStringAsync();
 
-            // Your logic for retrieving issues from Jira and populating Excel here
+                dynamic result = JObject.Parse(responseBody);
 
-            workbook.SaveAs(filename);
-            excelApp.Visible = true;
+                Excel.Range usedRange = worksheet.UsedRange;
+                int rowCount = usedRange.Rows.Count;
+                worksheet.Rows["2:" + rowCount].Delete();
 
+                Excel.Range startRange = worksheet.Cells[2, 1];
+                Excel.Range endRange = worksheet.Cells[rowCount + 1, 11];
+                Excel.Range range = worksheet.Range[startRange, endRange];
+                range.ClearContents();
 
+                int row = 2;
+                foreach (var issue in result.issues)
+                {
+                    worksheet.Cells[row, 1] = issue.key;
+                    worksheet.Cells[row, 2] = issue.fields.summary;
+                    worksheet.Cells[row, 3] = issue.fields.description ?? "";
+                    worksheet.Cells[row, 4] = issue.fields.priority.name;
+                    worksheet.Cells[row, 5] = issue.fields.status.name;
+                    worksheet.Cells[row, 6] = DateTime.Parse(issue.fields.created).ToString("yyyy-MM-dd");
+                    worksheet.Cells[row, 7] = DateTime.Parse(issue.fields.created).ToString("HH:mm:ss");
+                    if (issue.fields.resolutiondate != null)
+                    {
+                        worksheet.Cells[row, 8] = DateTime.Parse(issue.fields.resolutiondate).ToString("yyyy-MM-dd");
+                        worksheet.Cells[row, 9] = DateTime.Parse(issue.fields.resolutiondate).ToString("HH:mm:ss");
+                    }
+                    worksheet.Cells[row, 10] = issue.fields.reporter.displayName ?? "";
+                    worksheet.Cells[row, 11] = issue.fields.components.Count > 0 ? issue.fields.components[0].name : "";
+                    row++;
+                }
 
+                workbook.SaveAs(filename);
+                excelApp.Visible = true;
+            }
         }
+
     }
 }
