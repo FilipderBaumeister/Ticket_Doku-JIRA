@@ -1,145 +1,115 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using IOPath = System.IO.Path;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Xml.Linq;
-using Excel = Microsoft.Office.Interop.Excel;
-using Newtonsoft.Json.Linq;
-using System.Net.Http;
+from tkinter import Tk, Label, Entry, Button, StringVar
+from jira import JIRA
+import time
+import os
+import openpyxl
+from datetime import datetime
+from ttkthemes import ThemedTk
 
-namespace Ticket_Doku_Jira
-{
-    /// <summary>
-    /// Interaktionslogik für MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
-    {
-        public MainWindow()
-        {
-            InitializeComponent();
-        }
-        string jiraUsername = ".";
-        string jiraPassword = ".";
-        string jiraServer = ".";
-        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+desktop_path = os.path.join(os.path.expanduser("~"), "Documents")
 
-        private async void Button_Click(object sender, RoutedEventArgs e)
-        {
-            string start_date = start_var.Text;
-            string end_date = end_var.Text;
-            string ticket_number = ticket_var.Text;
-            string status = status_var.Text;
-            string priority = priority_var.Text;
-            
-            string filename = IOPath.Combine(desktopPath, "Dokumentation_Ticket.xlsx");
+# Jira login data
+jira_server = "."  # URL to your Jira server
+jira_username = "."  # Your username
+jira_password = "."  # Your password
 
-            Excel.Application excelApp = new Excel.Application();
-            excelApp.Visible = false;
-            Excel.Workbook workbook;
-            Excel.Worksheet worksheet;
+# Connect to Jira
+try:
+    jira = JIRA(server=jira_server, basic_auth=(jira_username, jira_password))
+except Exception as e:
+    print(f'Error connecting to Jira: {e}')
+    exit(1)
 
-            if (File.Exists(filename))
-            {
-                workbook = excelApp.Workbooks.Open(filename);
-                worksheet = workbook.ActiveSheet;
-            }
-            else
-            {
-                workbook = excelApp.Workbooks.Add();
-                worksheet = workbook.ActiveSheet;
-                worksheet.Cells[1, 1] = "Ticket number";
-                worksheet.Cells[1, 2] = "Title";
-                worksheet.Cells[1, 3] = "Description";
-                worksheet.Cells[1, 4] = "Priority";
-                worksheet.Cells[1, 5] = "Status";
-                worksheet.Cells[1, 6] = "Created on";
-                worksheet.Cells[1, 7] = "Created time";
-                worksheet.Cells[1, 8] = "Resolved on";
-                worksheet.Cells[1, 9] = "Resolved time";
-                worksheet.Cells[1, 10] = "Reporter";
-                worksheet.Cells[1, 11] = "Komponente";
-            }
+def get_input():
+    start_date = start_var.get()
+    end_date = end_var.get()
+    ticket_number = ticket_var.get()
+    status = status_var.get()
+    priority = priority_var.get()
 
-            string jql = "";
-            if (!string.IsNullOrEmpty(start_date) && !string.IsNullOrEmpty(end_date))
-            {
-                jql = $"project = PDT AND created >= '{start_date}' AND created <= '{end_date}'";
-            }
-            else if (!string.IsNullOrEmpty(ticket_number))
-            {
-                jql = $"project = PDT AND key = '{ticket_number}'";
-            }
-            else
-            {
-                jql = "project = PDT AND created >= -750d";
-            }
+    if start_date and end_date:
+        jql = f'project = PDT AND created >= {start_date} AND created <= {end_date}'
+    elif ticket_number:
+        jql = f'project = PDT AND key = {ticket_number}'
+    else:
+        jql = 'project = PDT AND created >= -750d'
 
-            if (!string.IsNullOrEmpty(status))
-            {
-                jql += $" AND status = '{status}'";
-            }
-            if (!string.IsNullOrEmpty(priority))
-            {
-                jql += $" AND priority = '{priority}'";
-            }
+    if status:
+        jql += f' AND status = "{status}"'
+    if priority:
+        jql += f' AND priority = "{priority}"'
 
-            using (HttpClient client = new HttpClient())
-            {
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-                    "Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{jiraUsername}:{jiraPassword}")));
+    # Create or open Excel file
+    filename = desktop_path + "\Dokumentation_Tickets.xlsx"
+    if os.path.exists(filename):
+        workbook = openpyxl.load_workbook(filename)
+        worksheet = workbook.active
+    else:
+        workbook = openpyxl.Workbook()
+        worksheet = workbook.active
+        worksheet.append(['Ticket number', 'Title', 'Description', 'Priority', 'Status','Created on', 'Created time', 'Resolved on', 'Resolved time','Reporter','Komponente'])
 
-                HttpResponseMessage response = await client.GetAsync($"{jiraServer}/rest/api/2/search?jql={jql}");
-                response.EnsureSuccessStatusCode();
-                string responseBody = await response.Content.ReadAsStringAsync();
+    issues = []
+    start_at = 0
+    max_results = 1000
+    while True:
+        new_tickets = jira.search_issues(jql, startAt=start_at, maxResults=max_results)
+        if not new_tickets:
+            break
+        issues.extend(new_tickets)
+        start_at += max_results
 
-                dynamic result = JObject.Parse(responseBody);
+    worksheet.delete_rows(2, worksheet.max_row)
 
-                Excel.Range usedRange = worksheet.UsedRange;
-                int rowCount = usedRange.Rows.Count;
-                worksheet.Rows["2:" + rowCount].Delete();
+    for ticket in issues:
+        issue = jira.issue(ticket.key)
+        ticket_number = ticket.key
+        title = issue.fields.summary
+        description = issue.fields.description if issue.fields.description else ""
+        priority = issue.fields.priority.name
+        status = issue.fields.status.name
+        Komponente = issue.fields.components[0].name if issue.fields.components else ""  # Added this line
+        created_datetime = datetime.strptime(issue.fields.created, '%Y-%m-%dT%H:%M:%S.%f%z')
+        created_on = created_datetime.strftime('%Y-%m-%d')
+        created_time = created_datetime.strftime('%H:%M:%S')
+        resolved_datetime = datetime.strptime(issue.fields.resolutiondate, '%Y-%m-%dT%H:%M:%S.%f%z') if issue.fields.resolutiondate else None
+        resolved_on = resolved_datetime.strftime('%Y-%m-%d') if resolved_datetime else ""
+        resolved_time = resolved_datetime.strftime('%H:%M:%S') if resolved_datetime else ""
+        reporter = issue.fields.reporter.displayName if issue.fields.reporter else ""
+        worksheet.append([ticket_number, title, description, priority, status, created_on, created_time, resolved_on, resolved_time, reporter, Komponente])  # Added 'Komponente' here
+       # print(f'New ticket found: {ticket_number} - {title} - {priority}-{Komponente}')  # Output system message
 
-                Excel.Range startRange = worksheet.Cells[2, 1];
-                Excel.Range endRange = worksheet.Cells[rowCount + 1, 11];
-                Excel.Range range = worksheet.Range[startRange, endRange];
-                range.ClearContents();
+    # Save Excel file
+    workbook.save(filename)
+    # Open Excel file
+    os.startfile(filename)
 
-                int row = 2;
-                foreach (var issue in result.issues)
-                {
-                    worksheet.Cells[row, 1] = issue.key;
-                    worksheet.Cells[row, 2] = issue.fields.summary;
-                    worksheet.Cells[row, 3] = issue.fields.description ?? "";
-                    worksheet.Cells[row, 4] = issue.fields.priority.name;
-                    worksheet.Cells[row, 5] = issue.fields.status.name;
-                    worksheet.Cells[row, 6] = DateTime.Parse(issue.fields.created).ToString("yyyy-MM-dd");
-                    worksheet.Cells[row, 7] = DateTime.Parse(issue.fields.created).ToString("HH:mm:ss");
-                    if (issue.fields.resolutiondate != null)
-                    {
-                        worksheet.Cells[row, 8] = DateTime.Parse(issue.fields.resolutiondate).ToString("yyyy-MM-dd");
-                        worksheet.Cells[row, 9] = DateTime.Parse(issue.fields.resolutiondate).ToString("HH:mm:ss");
-                    }
-                    worksheet.Cells[row, 10] = issue.fields.reporter.displayName ?? "";
-                    worksheet.Cells[row, 11] = issue.fields.components.Count > 0 ? issue.fields.components[0].name : "";
-                    row++;
-                }
+root = ThemedTk(theme="arc")  # Wählen Sie ein Thema aus, das Ihnen gefällt
+root.title('Ticket_Doku_Jira')
 
-                workbook.SaveAs(filename);
-                excelApp.Visible = true;
-            }
-        }
+start_var = StringVar()
+end_var = StringVar()
+ticket_var = StringVar()
+status_var = StringVar()
+priority_var = StringVar()
 
-    }
-}
+Label(root, text='Ticket Dokumentation', font=('Arial', 16, 'bold')).grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+
+Label(root, text='Start Datum(YYYY-MM-DD):').grid(row=1, column=0, sticky='w', padx=10, pady=10)
+Entry(root, textvariable=start_var).grid(row=1, column=1, padx=10, pady=10)
+
+Label(root, text='End Datum(YYYY-MM-DD):').grid(row=2, column=0, sticky='w', padx=10, pady=10)
+Entry(root, textvariable=end_var).grid(row=2, column=1, padx=10, pady=10)
+
+Label(root, text='Ticketnummer:').grid(row=3, column=0, sticky='w', padx=10, pady=10)
+Entry(root, textvariable=ticket_var).grid(row=3, column=1, padx=10, pady=10)
+
+Label(root, text='Status:').grid(row=4, column=0, sticky='w', padx=10, pady=10)
+Entry(root, textvariable=status_var).grid(row=4, column=1, padx=10, pady=10)
+
+Label(root, text='Priorität:').grid(row=5, column=0, sticky='w', padx=10, pady=10)
+Entry(root, textvariable=priority_var).grid(row=5, column=1, padx=10, pady=10)
+
+Button(root, text='Bestätigen', command=get_input).grid(row=6, column=0, columnspan=2, padx=10, pady=10)
+
+root.mainloop()
