@@ -1,0 +1,69 @@
+﻿<Window x:Class="Ticket_Doku_Jira.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ticket-Doku-JIRA" Height="375" Width="525">
+    <Window.Resources>
+        <!-- Modernisiertes Label-Design -->
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="#2E4A62"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <!-- Modernisiertes TextBox-Design -->
+        <Style TargetType="TextBox">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="BorderBrush" Value="#AAB7B8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <!-- Modernisiertes Button-Design -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#4C6377"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="0,20,0,0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="40"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Label Content="Ticket-Doku-JIRA" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" FontSize="24" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+        <Label Content="Startdatum (JJJJ-MM-TT)" Grid.Row="1" Grid.Column="0"/>
+        <TextBox x:Name="start_var" Grid.Row="1" Grid.Column="1"/>
+
+        <Label Content="Enddatum (JJJJ-MM-TT)" Grid.Row="2" Grid.Column="0"/>
+        <TextBox x:Name="end_var" Grid.Row="2" Grid.Column="1"/>
+
+        <Label Content="Ticketnummer" Grid.Row="3" Grid.Column="0"/>
+        <TextBox x:Name="ticket_var" Grid.Row="3" Grid.Column="1"/>
+
+        <Label Content="Status" Grid.Row="4" Grid.Column="0"/>
+        <TextBox x:Name="status_var" Grid.Row="4" Grid.Column="1"/>
+
+        <Label Content="Priorität" Grid.Row="5" Grid.Column="0"/>
+        <TextBox x:Name="priority_var" Grid.Row="5" Grid.Column="1"/>
+
+        <Button Content="Bestätigen" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Click="Button_Click"/>
+    </Grid>
+</Window>
