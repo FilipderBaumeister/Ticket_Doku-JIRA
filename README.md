@@ -1,4 +1,7 @@
 # Ticket_Doku-JIRA
+
+Frontend ist fertig backend muss noch gemacht werden
+
 Sicher, hier ist ein einfacher README-Entwurf für Ihr Projekt:
 
 ```markdown
