@@ -15,10 +15,13 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using System.Xml.Linq;
-using Excel = Microsoft.Office.Interop.Excel;
+using Atlassian.Jira;
+using OfficeOpenXml;
+using ExcelPackage = OfficeOpenXml.ExcelPackage;
+
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
+using OfficeOpenXml.Core.ExcelPackage;
 
 namespace Ticket_Doku_Jira
 {
@@ -31,49 +34,43 @@ namespace Ticket_Doku_Jira
         {
             InitializeComponent();
         }
-        string jiraUsername = ".";
-        string jiraPassword = ".";
-        string jiraServer = ".";
-        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        
 
-        private async void Button_Click(object sender, RoutedEventArgs e)
+
+        string jiraUsername = "Jira_PDT_01"; 
+        string jiraPassword = "Ji#bbmag#PDT#2023";
+        string jiraServer = "https://jira.bbraun.com"; 
+       private static  string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        public void Main()
         {
-            string start_date = start_var.Text;
-            string end_date = end_var.Text;
-            string ticket_number = ticket_var.Text;
-            string status = status_var.Text;
-            string priority = priority_var.Text;
-            
-            string filename = IOPath.Combine(desktopPath, "Dokumentation_Ticket.xlsx");
-
-            Excel.Application excelApp = new Excel.Application();
-            excelApp.Visible = false;
-            Excel.Workbook workbook;
-            Excel.Worksheet worksheet;
-
-            if (File.Exists(filename))
+            try
             {
-                workbook = excelApp.Workbooks.Open(filename);
-                worksheet = workbook.ActiveSheet;
+                var jira = Jira.CreateRestClient(jiraServer, jiraUsername, jiraPassword);
+                GetInput(jira);
             }
-            else
+            catch (Exception e)
             {
-                workbook = excelApp.Workbooks.Add();
-                worksheet = workbook.ActiveSheet;
-                worksheet.Cells[1, 1] = "Ticket number";
-                worksheet.Cells[1, 2] = "Title";
-                worksheet.Cells[1, 3] = "Description";
-                worksheet.Cells[1, 4] = "Priority";
-                worksheet.Cells[1, 5] = "Status";
-                worksheet.Cells[1, 6] = "Created on";
-                worksheet.Cells[1, 7] = "Created time";
-                worksheet.Cells[1, 8] = "Resolved on";
-                worksheet.Cells[1, 9] = "Resolved time";
-                worksheet.Cells[1, 10] = "Reporter";
-                worksheet.Cells[1, 11] = "Komponente";
+                Console.WriteLine($"Error connecting to Jira: {e}");
+                Environment.Exit(1);
             }
+        }
+        private static void GetInput(Jira jira)
+        {
+            var startVar = new TextBox();
+            var endVar = new TextBox();
+            var ticketVar = new TextBox();
+            var statusVar = new TextBox();
+            var priorityVar = new TextBox();
 
-            string jql = "";
+            string start_date = startVar.Text;
+            string end_date = endVar.Text;
+            string ticket_number = ticketVar.Text;
+            string status = statusVar.Text;
+            string priority = priorityVar.Text;
+
+            string jql;
+
             if (!string.IsNullOrEmpty(start_date) && !string.IsNullOrEmpty(end_date))
             {
                 jql = $"project = PDT AND created >= '{start_date}' AND created <= '{end_date}'";
@@ -89,57 +86,104 @@ namespace Ticket_Doku_Jira
 
             if (!string.IsNullOrEmpty(status))
             {
-                jql += $" AND status = '{status}'";
+                jql += $" AND status = \"{status}\"";
             }
             if (!string.IsNullOrEmpty(priority))
             {
-                jql += $" AND priority = '{priority}'";
+                jql += $" AND priority = \"{priority}\"";
             }
 
-            using (HttpClient client = new HttpClient())
+            string filename = IOPath.Combine(desktopPath,"Dokumentation_Tickets.xlsx");
+            ExcelPackage package;
+            FileInfo fileInfo = new FileInfo(filename);
+            if (fileInfo.Exists)
             {
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-                    "Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{jiraUsername}:{jiraPassword}")));
-
-                HttpResponseMessage response = await client.GetAsync($"{jiraServer}/rest/api/2/search?jql={jql}");
-                response.EnsureSuccessStatusCode();
-                string responseBody = await response.Content.ReadAsStringAsync();
-
-                dynamic result = JObject.Parse(responseBody);
-
-                Excel.Range usedRange = worksheet.UsedRange;
-                int rowCount = usedRange.Rows.Count;
-                worksheet.Rows["2:" + rowCount].Delete();
-
-                Excel.Range startRange = worksheet.Cells[2, 1];
-                Excel.Range endRange = worksheet.Cells[rowCount + 1, 11];
-                Excel.Range range = worksheet.Range[startRange, endRange];
-                range.ClearContents();
-
-                int row = 2;
-                foreach (var issue in result.issues)
+                using (var stream = File.OpenRead(filename))
                 {
-                    worksheet.Cells[row, 1] = issue.key;
-                    worksheet.Cells[row, 2] = issue.fields.summary;
-                    worksheet.Cells[row, 3] = issue.fields.description ?? "";
-                    worksheet.Cells[row, 4] = issue.fields.priority.name;
-                    worksheet.Cells[row, 5] = issue.fields.status.name;
-                    worksheet.Cells[row, 6] = DateTime.Parse(issue.fields.created).ToString("yyyy-MM-dd");
-                    worksheet.Cells[row, 7] = DateTime.Parse(issue.fields.created).ToString("HH:mm:ss");
-                    if (issue.fields.resolutiondate != null)
-                    {
-                        worksheet.Cells[row, 8] = DateTime.Parse(issue.fields.resolutiondate).ToString("yyyy-MM-dd");
-                        worksheet.Cells[row, 9] = DateTime.Parse(issue.fields.resolutiondate).ToString("HH:mm:ss");
-                    }
-                    worksheet.Cells[row, 10] = issue.fields.reporter.displayName ?? "";
-                    worksheet.Cells[row, 11] = issue.fields.components.Count > 0 ? issue.fields.components[0].name : "";
-                    row++;
+                    package = new ExcelPackage(fileInfo);
+                }
+            }
+         
+            else
+            {
+                package = new ExcelPackage(fileInfo);
+                var worksheet = package.Workbook.Worksheets.Add("Sheet1");
+                worksheet.Cells["A1"].Value = "Ticket number";
+                worksheet.Cells["B1"].Value = "Title";
+                worksheet.Cells["C1"].Value = "Description";
+                worksheet.Cells["D1"].Value = "Priority";
+                worksheet.Cells["E1"].Value = "Status";
+                worksheet.Cells["F1"].Value = "Created on";
+                worksheet.Cells["G1"].Value = "Created time";
+                worksheet.Cells["H1"].Value = "Resolved on";
+                worksheet.Cells["I1"].Value = "Resolved time";
+                worksheet.Cells["J1"].Value = "Reporter";
+                worksheet.Cells["K1"].Value = "Komponente";
+            }
+
+            var issues = new List<Issue>();
+            int startAt = 0;
+            const int maxResults = 1000;
+
+            while (true)
+            {
+                var newTickets = jira.Issues.QueryAsync(jql, startAt, maxResults).Result;
+
+                if (!newTickets.Any())
+                {
+                    break;
                 }
 
-                workbook.SaveAs(filename);
-                excelApp.Visible = true;
+                issues.AddRange(newTickets);
+                startAt += maxResults;
             }
+
+            using (var packageStream = new MemoryStream())
+            {
+                var worksheet = package.Workbook.Worksheets["Sheet1"];
+                worksheet.DeleteRow(2, worksheet.Dimension.End.Row);
+
+                foreach (var ticket in issues)
+                {
+                    var issue = jira.Issues.GetIssueAsync(ticket.Key.Value).Result;
+                    string ticketNumber = ticket.Key.Value;
+                    string title = issue.Summary;
+                    string description = issue.Description ?? "";
+                    string priorityName = issue.Priority.Name;
+                    string statusName = issue.Status.Name;
+                    string komponente = issue.Components.Any() ? issue.Components.First().Name : "";
+
+                    DateTime createdDateTime = DateTime.ParseExact(issue.Created.Value.ToString("o"), "yyyy-MM-ddTHH:mm:ss.fffZ", null);
+                    string createdOn = createdDateTime.ToString("yyyy-MM-dd");
+                    string createdTime = createdDateTime.ToString("HH:mm:ss");
+
+                    DateTime? resolvedDateTime = issue.ResolutionDate;
+                    string resolvedOn = resolvedDateTime?.ToString("yyyy-MM-dd") ?? "";
+                    string resolvedTime = resolvedDateTime?.ToString("HH:mm:ss") ?? "";
+
+                    string reporter = issue.Reporter.DisplayName ?? "";
+
+                    worksheet.Cells[worksheet.Dimension.End.Row + 1, 1].Value = ticketNumber;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 2].Value = title;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 3].Value = description;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 4].Value = priorityName;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 5].Value = statusName;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 6].Value = createdOn;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 7].Value = createdTime;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 8].Value = resolvedOn;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 9].Value = resolvedTime;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 10].Value = reporter;
+                    worksheet.Cells[worksheet.Dimension.End.Row, 11].Value = komponente;
+                }
+
+                package.SaveAs(new FileInfo(filename));
+            }
+
+            System.Diagnostics.Process.Start(filename);
         }
+        private async void Button_Click(object sender, RoutedEventArgs e)
+        {
+        }    
 
     }
 }
